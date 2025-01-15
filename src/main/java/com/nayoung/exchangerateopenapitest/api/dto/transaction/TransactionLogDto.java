@@ -9,7 +9,7 @@ public record TransactionLogDto (
 	Long sendId,
 	Long receiverId,
 	BigDecimal exchangeRate,
-	Long amount,
-	Long balanceAfterTransaction
+	BigDecimal amount,
+	BigDecimal balanceAfterTransaction
 ) {
 }

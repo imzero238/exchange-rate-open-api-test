@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -16,6 +17,7 @@ import java.time.LocalDateTime;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
 public class TransactionLog {
 
 	@Id
@@ -39,11 +41,12 @@ public class TransactionLog {
 	private BigDecimal exchangeRate;
 
 	@Column(nullable = false)
-	private Long amount;
+	private BigDecimal amount;
 
 	@Column(nullable = false)
-	private Long balanceAfterTransaction;
+	private BigDecimal balanceAfterTransaction;
 
 	@CreatedDate
+	@Column(updatable = false)
 	private LocalDateTime createdAt;
 }

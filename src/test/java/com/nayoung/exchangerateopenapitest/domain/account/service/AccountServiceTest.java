@@ -11,6 +11,8 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,7 +30,7 @@ class AccountServiceTest {
 			.thenReturn(Mockito.mock(Account.class));
 
 		AccountRegisterRequestDto request = AccountRegisterRequestDto.builder()
-			.money(2000L)
+			.money(new BigDecimal(2000))
 			.currency(Currency.KRW)
 			.build();
 

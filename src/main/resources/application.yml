@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: exchange-rate-open-api-test
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/test_db
+    username: root
+
+exchange-rate:
+  naver:
+    host: https://m.search.naver.com
+    url: /p/csearch/content/qapirender.nhn
+    request-param:
+      key: calculator
+      pkid: 141
+      q: "%ED%99%98%EC%9C%A8"
+      where: m
+      u1: keb
+      u6: standardUnit
+      u7: 0
+      u3: USD
+      u4: KRW
+      u8: down
+      u2: 1

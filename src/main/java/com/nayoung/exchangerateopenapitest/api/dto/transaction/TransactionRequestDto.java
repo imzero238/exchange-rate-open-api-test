@@ -3,6 +3,8 @@ package com.nayoung.exchangerateopenapitest.api.dto.transaction;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
+import java.math.BigDecimal;
+
 public record TransactionRequestDto (
 	@NotNull(message = "SenderId must not be null.")
 	@Min(value = 1, message = "SenderId must be at least 1.")
@@ -14,6 +16,6 @@ public record TransactionRequestDto (
 
 	@NotNull(message = "Amount must not be null.")
 	@Min(value = 1, message = "Amount must be at least 1.")
-	Long amount
+	BigDecimal amount
 ) {
 }

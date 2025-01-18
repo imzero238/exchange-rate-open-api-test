@@ -16,14 +16,14 @@ import static org.junit.jupiter.api.Assertions.*;
 class ExchangeRateScraperTest {
 
 	@Autowired
-	ExchangeRateScraper exchangeRateScraper;
+	GoogleFinanceExchangeRateScraper googleFinanceExchangeRateScraper;
 
 	@Test
 	void USD_KRW_test() {
 		String fromCurrency = String.valueOf(Currency.USD);
 		String toCurrency = String.valueOf(Currency.KRW);
 
-		BigDecimal exchangeRate = exchangeRateScraper.getExchangeRate(fromCurrency, toCurrency);
+		BigDecimal exchangeRate = googleFinanceExchangeRateScraper.getExchangeRate(fromCurrency, toCurrency);
 
 		assertNotNull(exchangeRate);
 		assertTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0);
@@ -35,7 +35,7 @@ class ExchangeRateScraperTest {
 		String fromCurrency = String.valueOf(Currency.JPY);
 		String toCurrency = String.valueOf(Currency.KRW);
 
-		BigDecimal exchangeRate = exchangeRateScraper.getExchangeRate(fromCurrency, toCurrency);
+		BigDecimal exchangeRate = googleFinanceExchangeRateScraper.getExchangeRate(fromCurrency, toCurrency);
 
 		assertNotNull(exchangeRate);
 		assertTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0);
@@ -47,7 +47,7 @@ class ExchangeRateScraperTest {
 		String fromCurrency = String.valueOf(Currency.EUR);
 		String toCurrency = String.valueOf(Currency.KRW);
 
-		BigDecimal exchangeRate = exchangeRateScraper.getExchangeRate(fromCurrency, toCurrency);
+		BigDecimal exchangeRate = googleFinanceExchangeRateScraper.getExchangeRate(fromCurrency, toCurrency);
 
 		assertNotNull(exchangeRate);
 		assertTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0);
@@ -59,7 +59,7 @@ class ExchangeRateScraperTest {
 		String fromCurrency = "USDD";
 		String toCurrency = String.valueOf(Currency.KRW);
 
-		Assertions.assertThatThrownBy(() -> exchangeRateScraper.getExchangeRate(fromCurrency, toCurrency))
+		Assertions.assertThatThrownBy(() -> googleFinanceExchangeRateScraper.getExchangeRate(fromCurrency, toCurrency))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("No exchange rate information found for: USDD to KRW");
 	}

@@ -20,10 +20,7 @@ class ExchangeRateScraperTest {
 
 	@Test
 	void USD_KRW_test() {
-		String fromCurrency = String.valueOf(Currency.USD);
-		String toCurrency = String.valueOf(Currency.KRW);
-
-		BigDecimal exchangeRate = exchangeRateGoogleFinanceScraper.getExchangeRate(fromCurrency, toCurrency);
+		BigDecimal exchangeRate = exchangeRateGoogleFinanceScraper.getExchangeRate(Currency.USD, Currency.KRW);
 
 		assertNotNull(exchangeRate);
 		assertTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0);
@@ -32,10 +29,7 @@ class ExchangeRateScraperTest {
 
 	@Test
 	void JPY_KRW_test() {
-		String fromCurrency = String.valueOf(Currency.JPY);
-		String toCurrency = String.valueOf(Currency.KRW);
-
-		BigDecimal exchangeRate = exchangeRateGoogleFinanceScraper.getExchangeRate(fromCurrency, toCurrency);
+		BigDecimal exchangeRate = exchangeRateGoogleFinanceScraper.getExchangeRate(Currency.JPY, Currency.KRW);
 
 		assertNotNull(exchangeRate);
 		assertTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0);
@@ -44,10 +38,7 @@ class ExchangeRateScraperTest {
 
 	@Test
 	void EUR_KRW_test() {
-		String fromCurrency = String.valueOf(Currency.EUR);
-		String toCurrency = String.valueOf(Currency.KRW);
-
-		BigDecimal exchangeRate = exchangeRateGoogleFinanceScraper.getExchangeRate(fromCurrency, toCurrency);
+		BigDecimal exchangeRate = exchangeRateGoogleFinanceScraper.getExchangeRate(Currency.EUR, Currency.KRW);
 
 		assertNotNull(exchangeRate);
 		assertTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0);
@@ -56,10 +47,7 @@ class ExchangeRateScraperTest {
 
 	@Test
 	void invalid_currency_test() {
-		String fromCurrency = "USDD";
-		String toCurrency = String.valueOf(Currency.KRW);
-
-		Assertions.assertThatThrownBy(() -> exchangeRateGoogleFinanceScraper.getExchangeRate(fromCurrency, toCurrency))
+		Assertions.assertThatThrownBy(() -> exchangeRateGoogleFinanceScraper.getExchangeRate(Currency.USDD, Currency.KRW))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("No exchange rate information found for: USDD to KRW");
 	}

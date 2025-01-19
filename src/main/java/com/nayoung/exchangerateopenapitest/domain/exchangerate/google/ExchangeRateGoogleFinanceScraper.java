@@ -1,5 +1,6 @@
 package com.nayoung.exchangerateopenapitest.domain.exchangerate.google;
 
+import com.nayoung.exchangerateopenapitest.domain.account.Currency;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -13,7 +14,7 @@ import java.math.RoundingMode;
 @Slf4j
 public class ExchangeRateGoogleFinanceScraper {
 
-	public BigDecimal getExchangeRate(String fromCurrency, String toCurrency){
+	public BigDecimal getExchangeRate(Currency fromCurrency, Currency toCurrency){
 		String url = "https://www.google.com/finance/quote/" + fromCurrency + "-" + toCurrency;
 
 		try {

@@ -5,5 +5,7 @@ public enum Currency {
 	KRW,
 	USD,
 	JPY,
-	EUR
+	EUR,
+
+	USDD // 예외 테스트용
 }

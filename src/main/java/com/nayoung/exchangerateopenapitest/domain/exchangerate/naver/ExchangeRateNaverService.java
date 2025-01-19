@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
-public class ExchangeRateService {
+public class ExchangeRateNaverService {
 
 	private final ExchangeRateNaverClient exchangeRateNaverClient;
 

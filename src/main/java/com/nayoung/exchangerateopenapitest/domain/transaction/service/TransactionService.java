@@ -5,7 +5,7 @@ import com.nayoung.exchangerateopenapitest.api.dto.transaction.TransactionReques
 import com.nayoung.exchangerateopenapitest.domain.account.Account;
 import com.nayoung.exchangerateopenapitest.domain.account.Currency;
 import com.nayoung.exchangerateopenapitest.domain.account.repository.AccountRepository;
-import com.nayoung.exchangerateopenapitest.domain.exchangerate.naver.ExchangeRateService;
+import com.nayoung.exchangerateopenapitest.domain.exchangerate.naver.ExchangeRateNaverService;
 import com.nayoung.exchangerateopenapitest.domain.transaction.TransactionLog;
 import com.nayoung.exchangerateopenapitest.domain.transaction.TransactionType;
 import com.nayoung.exchangerateopenapitest.domain.transaction.repository.TransactionLogRepository;
@@ -20,7 +20,7 @@ public class TransactionService {
 
 	private final TransactionLogRepository transactionLogRepository;
 	private final AccountRepository accountRepository;
-	private final ExchangeRateService exchangeRateService;
+	private final ExchangeRateNaverService exchangeRateService;
 
 	public TransactionLogDto transfer(TransactionRequestDto transactionRequestDto) {
 		Account senderAccount = accountRepository.findById(transactionRequestDto.senderId())

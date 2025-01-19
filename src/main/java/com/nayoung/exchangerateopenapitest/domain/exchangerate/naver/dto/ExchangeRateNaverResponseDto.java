@@ -1,16 +1,19 @@
 package com.nayoung.exchangerateopenapitest.domain.exchangerate.naver.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record ExchangeRateNaverResponseDto (
-	int pkid,
-	int count,
-	List<Country> country,
-	String calculatorMessage
+	@JsonProperty("pkid") int pkid,
+	@JsonProperty("count") int count,
+	@JsonProperty("country") List<Country> country,
+	@JsonProperty("calculatorMessage") String calculatorMessage
 ) {
 	public record Country (
-		String value,
-		String subValue,
-		String currencyUnit
+		@JsonProperty("value") String value,
+		@JsonProperty("subValue") String subValue,
+		@JsonProperty("currencyUnit") String currencyUnit
 	) {}
 }

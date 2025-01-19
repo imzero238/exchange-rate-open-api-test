@@ -11,7 +11,7 @@ import java.math.RoundingMode;
 
 @Component
 @Slf4j
-public class GoogleFinanceExchangeRateScraper {
+public class ExchangeRateGoogleFinanceScraper {
 
 	public BigDecimal getExchangeRate(String fromCurrency, String toCurrency){
 		String url = "https://www.google.com/finance/quote/" + fromCurrency + "-" + toCurrency;

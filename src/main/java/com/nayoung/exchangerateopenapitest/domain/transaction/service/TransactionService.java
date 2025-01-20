@@ -5,22 +5,24 @@ import com.nayoung.exchangerateopenapitest.api.dto.transaction.TransactionReques
 import com.nayoung.exchangerateopenapitest.domain.account.Account;
 import com.nayoung.exchangerateopenapitest.domain.account.Currency;
 import com.nayoung.exchangerateopenapitest.domain.account.repository.AccountRepository;
-import com.nayoung.exchangerateopenapitest.domain.exchangerate.naver.ExchangeRateNaverService;
+import com.nayoung.exchangerateopenapitest.domain.exchangerate.ExchangeRateService;
 import com.nayoung.exchangerateopenapitest.domain.transaction.TransactionLog;
 import com.nayoung.exchangerateopenapitest.domain.transaction.TransactionType;
 import com.nayoung.exchangerateopenapitest.domain.transaction.repository.TransactionLogRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TransactionService {
 
 	private final TransactionLogRepository transactionLogRepository;
 	private final AccountRepository accountRepository;
-	private final ExchangeRateNaverService exchangeRateService;
+	private final ExchangeRateService exchangeRateService;
 
 	public TransactionLogDto transfer(TransactionRequestDto transactionRequestDto) {
 		Account senderAccount = accountRepository.findById(transactionRequestDto.senderId())
@@ -29,13 +31,37 @@ public class TransactionService {
 		Account receiverAccount = accountRepository.findById(transactionRequestDto.receiverId())
 			.orElseThrow(() -> new RuntimeException("Receiver Account not found"));
 
-		BigDecimal exchangeRate = new BigDecimal(1);
-		if(senderAccount.getCurrency() != receiverAccount.getCurrency()) {
-			exchangeRate = exchangeRateService.getExchangeRate(receiverAccount.getCurrency(), senderAccount.getCurrency());
-			if(exchangeRate.compareTo(BigDecimal.ZERO) <= 0) {
-				throw new IllegalArgumentException("Invalid exchange rate");
+		BigDecimal exchangeRate = null;
+		if (senderAccount.getCurrency() == receiverAccount.getCurrency()) {
+			exchangeRate = new BigDecimal(1);
+		}
+		else {
+			long currentTime = System.currentTimeMillis();
+			long timeout = 4000;
+			long endTime = currentTime + timeout;
+
+			while (System.currentTimeMillis() < endTime) {
+				if (exchangeRateService.isAvailableExchangeRate(receiverAccount.getCurrency(), senderAccount.getCurrency())) {
+					exchangeRate = exchangeRateService.getExchangeRate(receiverAccount.getCurrency(), senderAccount.getCurrency());
+					break;
+				}
+
+				exchangeRateService.updateExchangeRate(receiverAccount.getCurrency(), senderAccount.getCurrency());
+				try {
+					if (!exchangeRateService.isAvailableExchangeRate(receiverAccount.getCurrency(), senderAccount.getCurrency())) {
+						Thread.sleep(150);
+					}
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+				}
+			}
+
+			if (exchangeRate == null || exchangeRate.compareTo(BigDecimal.ZERO) <= 0) {
+				log.warn("[ Timeout ] 현재 실시간 환율을 이용할 수 없습니다. " + Thread.currentThread().getName());
+				throw new IllegalArgumentException("현재 실시간 환율을 이용할 수 없습니다.");
 			}
 		}
+
 		BigDecimal expectedWithdrawalAmount = exchangeRate.multiply(transactionRequestDto.amount());
 		BigDecimal senderBalanceAfterTransaction = senderAccount.updateMoney(TransactionType.withdrawal, expectedWithdrawalAmount);
 		BigDecimal receiverBalanceAfterTransaction = receiverAccount.updateMoney(TransactionType.deposit, transactionRequestDto.amount());

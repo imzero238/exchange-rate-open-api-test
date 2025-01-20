@@ -13,53 +13,47 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
-class ExchangeRateScraperTest {
+class ExchangeRateGoogleFinanceScraperTest {
 
 	@Autowired
-	GoogleFinanceExchangeRateScraper googleFinanceExchangeRateScraper;
+	ExchangeRateGoogleFinanceScraper exchangeRateGoogleFinanceScraper;
 
 	@Test
 	void USD_KRW_test() {
-		String fromCurrency = String.valueOf(Currency.USD);
-		String toCurrency = String.valueOf(Currency.KRW);
-
-		BigDecimal exchangeRate = googleFinanceExchangeRateScraper.getExchangeRate(fromCurrency, toCurrency);
+		BigDecimal exchangeRate = exchangeRateGoogleFinanceScraper.getExchangeRate(Currency.USD, Currency.KRW);
 
 		assertNotNull(exchangeRate);
 		assertTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0);
 		assertEquals(2, exchangeRate.scale());
+
+		System.out.println("[Google] " +  Currency.USD + " " + exchangeRate);
 	}
 
 	@Test
 	void JPY_KRW_test() {
-		String fromCurrency = String.valueOf(Currency.JPY);
-		String toCurrency = String.valueOf(Currency.KRW);
-
-		BigDecimal exchangeRate = googleFinanceExchangeRateScraper.getExchangeRate(fromCurrency, toCurrency);
+		BigDecimal exchangeRate = exchangeRateGoogleFinanceScraper.getExchangeRate(Currency.JPY, Currency.KRW);
 
 		assertNotNull(exchangeRate);
 		assertTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0);
 		assertEquals(2, exchangeRate.scale());
+
+		System.out.println("[Google] " +  Currency.JPY + " " + exchangeRate);
 	}
 
 	@Test
 	void EUR_KRW_test() {
-		String fromCurrency = String.valueOf(Currency.EUR);
-		String toCurrency = String.valueOf(Currency.KRW);
-
-		BigDecimal exchangeRate = googleFinanceExchangeRateScraper.getExchangeRate(fromCurrency, toCurrency);
+		BigDecimal exchangeRate = exchangeRateGoogleFinanceScraper.getExchangeRate(Currency.EUR, Currency.KRW);
 
 		assertNotNull(exchangeRate);
 		assertTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0);
 		assertEquals(2, exchangeRate.scale());
+
+		System.out.println("[Google] " +  Currency.EUR + " " + exchangeRate);
 	}
 
 	@Test
 	void invalid_currency_test() {
-		String fromCurrency = "USDD";
-		String toCurrency = String.valueOf(Currency.KRW);
-
-		Assertions.assertThatThrownBy(() -> googleFinanceExchangeRateScraper.getExchangeRate(fromCurrency, toCurrency))
+		Assertions.assertThatThrownBy(() -> exchangeRateGoogleFinanceScraper.getExchangeRate(Currency.USDD, Currency.KRW))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("No exchange rate information found for: USDD to KRW");
 	}

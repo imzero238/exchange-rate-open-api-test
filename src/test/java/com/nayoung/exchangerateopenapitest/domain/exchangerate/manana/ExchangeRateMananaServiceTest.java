@@ -24,6 +24,8 @@ class ExchangeRateMananaServiceTest {
 		assertNotNull(exchangeRate);
 		assertTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0);
 		assertEquals(2, exchangeRate.scale());
+
+		System.out.println("[Manana] " +  Currency.USD + " " + exchangeRate);
 	}
 
 	@Test
@@ -33,6 +35,8 @@ class ExchangeRateMananaServiceTest {
 		assertNotNull(exchangeRate);
 		assertTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0);
 		assertEquals(2, exchangeRate.scale());
+
+		System.out.println("[Manana] " +  Currency.JPY + " " + exchangeRate);
 	}
 
 	@Test
@@ -42,5 +46,7 @@ class ExchangeRateMananaServiceTest {
 		assertNotNull(exchangeRate);
 		assertTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0);
 		assertEquals(2, exchangeRate.scale());
+
+		System.out.println("[Manana] " +  Currency.EUR + " " + exchangeRate);
 	}
 }

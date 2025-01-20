@@ -9,13 +9,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -45,48 +45,57 @@ public class ExchangeRateService {
 			if(isAvailableExchangeRate(fromCurrency, toCurrency)) {
 				return;
 			}
-			CompletableFuture<BigDecimal> naverExchangeRateFuture = CompletableFuture
+			CompletableFuture
 				.supplyAsync(() -> naverService.getExchangeRate(fromCurrency, toCurrency))
-				.orTimeout(CACHE_EXPIRY_TIME, TimeUnit.MILLISECONDS);
+				.orTimeout(CACHE_EXPIRY_TIME, TimeUnit.MILLISECONDS)
+				.thenApply(result -> new BigDecimal(result.toString())
+					.setScale(2, RoundingMode.CEILING))
+				.thenApply(exchangeRate -> {
+					updateExchangeRateStatus(fromCurrency, exchangeRate);
 
-			updateExchangeRateStatus(fromCurrency, naverExchangeRateFuture.get());
-			log.info("[Main(Naver)] {} 환율 {} 업데이트, {}",
-				fromCurrency,
-				exchangeRateResults.get(fromCurrency).exchangeRate,
-				formatter.format(Instant.ofEpochMilli(exchangeRateResults.get(fromCurrency).lastCachedTime)));
-		} catch (InterruptedException | ExecutionException e) {
-			log.error("Naver API failed or timed out, calling Manana and Google... ");
-			e.printStackTrace();
-			fallbackUpdate(fromCurrency, toCurrency);
+					log.info("[Main(Naver)] {} 환율 {} 업데이트, {}",
+						fromCurrency,
+						exchangeRate,
+						formatter.format(Instant.ofEpochMilli(exchangeRateResults.get(fromCurrency).lastCachedTime)));
+					return exchangeRate;
+				})
+				.exceptionally(ex ->  {
+					log.error("Naver API failed or timed out, calling Manana and Google... {}", ex.getMessage());
+					fallbackUpdate(fromCurrency, toCurrency);
+					return null;
+				}).join();
 		} finally {
 			lock.unlock();
 		}
 	}
 
 	private void fallbackUpdate(Currency fromCurrency, Currency toCurrency) {
-		try {
-			CompletableFuture<BigDecimal> mananaExchangeRateFuture = CompletableFuture
-				.supplyAsync(() -> mananaService.getExchangeRate(fromCurrency, toCurrency))
-				.orTimeout(CACHE_EXPIRY_TIME, TimeUnit.MILLISECONDS);
-
-			CompletableFuture<BigDecimal> googleExchangeRateFuture = CompletableFuture
-				.supplyAsync(() -> googleFinanceScraper.getExchangeRate(fromCurrency, toCurrency))
-				.orTimeout(CACHE_EXPIRY_TIME, TimeUnit.MILLISECONDS);
-
-			updateExchangeRateStatus(
-				fromCurrency,
+		CompletableFuture
+			.anyOf(
 				CompletableFuture
-					.anyOf(mananaExchangeRateFuture, googleExchangeRateFuture)
-					.thenApply(result -> (BigDecimal) result)
-					.get());
+					.supplyAsync(() -> mananaService.getExchangeRate(fromCurrency, toCurrency))
+					.orTimeout(CACHE_EXPIRY_TIME, TimeUnit.MILLISECONDS),
 
-			log.info("[Fallback] {} 환율 {} 업데이트, {}",
-				fromCurrency,
-				exchangeRateResults.get(fromCurrency).exchangeRate,
-				formatter.format(Instant.ofEpochMilli(exchangeRateResults.get(fromCurrency).lastCachedTime)));
-		} catch (InterruptedException | ExecutionException e) {
-			log.error(e.getMessage());
-		}
+				CompletableFuture
+					.supplyAsync(() -> googleFinanceScraper.getExchangeRate(fromCurrency, toCurrency))
+					.orTimeout(CACHE_EXPIRY_TIME, TimeUnit.MILLISECONDS))
+			.thenApply(result -> new BigDecimal(result.toString())
+						.setScale(2, RoundingMode.CEILING))
+					.thenApply(exchangeRate -> {
+				updateExchangeRateStatus(fromCurrency, exchangeRate);
+
+				log.info("[Fallback] {} 환율 {} 업데이트, {}",
+					fromCurrency,
+					exchangeRateResults.get(fromCurrency).exchangeRate,
+					formatter.format(Instant.ofEpochMilli(exchangeRateResults.get(fromCurrency).lastCachedTime)));
+
+				return exchangeRate;
+			})
+			.exceptionally(ex -> {
+				log.error(ex.getMessage());
+				throw new RuntimeException("Unable to fetch exchange rate", ex);
+			})
+			.join();
 	}
 
 	private void updateExchangeRateStatus(Currency fromCurrency, BigDecimal exchangeRate) {

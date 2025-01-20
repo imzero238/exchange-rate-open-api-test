@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
-class ExchangeRateScraperTest {
+class ExchangeRateGoogleFinanceScraperTest {
 
 	@Autowired
 	ExchangeRateGoogleFinanceScraper exchangeRateGoogleFinanceScraper;
@@ -25,6 +25,8 @@ class ExchangeRateScraperTest {
 		assertNotNull(exchangeRate);
 		assertTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0);
 		assertEquals(2, exchangeRate.scale());
+
+		System.out.println("[Google] " +  Currency.USD + " " + exchangeRate);
 	}
 
 	@Test
@@ -34,6 +36,8 @@ class ExchangeRateScraperTest {
 		assertNotNull(exchangeRate);
 		assertTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0);
 		assertEquals(2, exchangeRate.scale());
+
+		System.out.println("[Google] " +  Currency.JPY + " " + exchangeRate);
 	}
 
 	@Test
@@ -43,6 +47,8 @@ class ExchangeRateScraperTest {
 		assertNotNull(exchangeRate);
 		assertTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0);
 		assertEquals(2, exchangeRate.scale());
+
+		System.out.println("[Google] " +  Currency.EUR + " " + exchangeRate);
 	}
 
 	@Test

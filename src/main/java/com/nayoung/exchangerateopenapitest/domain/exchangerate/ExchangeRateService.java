@@ -28,9 +28,9 @@ public class ExchangeRateService {
 	private final ExchangeRateMananaService mananaService;
 	private final ExchangeRateGoogleFinanceScraper googleFinanceScraper;
 
-	private final ReentrantLock lock = new ReentrantLock();
-	private final long CACHE_EXPIRY_TIME = 2000;
+	private final ConcurrentHashMap<Currency, ReentrantLock> currencyLocks = new ConcurrentHashMap<>();
 	private final Map<Currency, ExchangeRateStatus> exchangeRateResults = new ConcurrentHashMap<>();
+	private final long CACHE_EXPIRY_TIME = 2000;
 
 	private DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 		.withZone(ZoneId.systemDefault());
@@ -39,33 +39,39 @@ public class ExchangeRateService {
 		if(isAvailableExchangeRate(fromCurrency, toCurrency)) {
 			return;
 		}
-		lock.lock();
 
-		try {
-			if(isAvailableExchangeRate(fromCurrency, toCurrency)) {
-				return;
+		ReentrantLock lock = currencyLocks.computeIfAbsent(fromCurrency, k -> new ReentrantLock());
+		if(lock.tryLock()) {
+			try {
+				// double checking
+				if (isAvailableExchangeRate(fromCurrency, toCurrency)) {
+					return;
+				}
+
+				CompletableFuture
+					.supplyAsync(() -> naverService.getExchangeRate(fromCurrency, toCurrency))
+					.orTimeout(CACHE_EXPIRY_TIME, TimeUnit.MILLISECONDS)
+					.thenApply(result -> new BigDecimal(result.toString())
+						.setScale(2, RoundingMode.CEILING))
+					.thenApply(exchangeRate -> {
+						updateExchangeRateStatus(fromCurrency, exchangeRate);
+
+						log.info("[Main(Naver)] {} 환율 {} 업데이트, {}",
+							fromCurrency,
+							exchangeRate,
+							formatter.format(Instant.ofEpochMilli(exchangeRateResults.get(fromCurrency).lastCachedTime)));
+						return exchangeRate;
+					})
+					.exceptionally(ex -> {
+						log.error("Naver API failed or timed out, calling Manana and Google... {}", ex.getMessage());
+						fallbackUpdate(fromCurrency, toCurrency);
+						return null;
+					}).join();
+			} finally {
+				lock.unlock();
 			}
-			CompletableFuture
-				.supplyAsync(() -> naverService.getExchangeRate(fromCurrency, toCurrency))
-				.orTimeout(CACHE_EXPIRY_TIME, TimeUnit.MILLISECONDS)
-				.thenApply(result -> new BigDecimal(result.toString())
-					.setScale(2, RoundingMode.CEILING))
-				.thenApply(exchangeRate -> {
-					updateExchangeRateStatus(fromCurrency, exchangeRate);
-
-					log.info("[Main(Naver)] {} 환율 {} 업데이트, {}",
-						fromCurrency,
-						exchangeRate,
-						formatter.format(Instant.ofEpochMilli(exchangeRateResults.get(fromCurrency).lastCachedTime)));
-					return exchangeRate;
-				})
-				.exceptionally(ex ->  {
-					log.error("Naver API failed or timed out, calling Manana and Google... {}", ex.getMessage());
-					fallbackUpdate(fromCurrency, toCurrency);
-					return null;
-				}).join();
-		} finally {
-			lock.unlock();
+		} else {
+			log.info("다른 스레드에 의해 {} 단위가 업데이트 중입니다.", fromCurrency);
 		}
 	}
 
@@ -79,9 +85,10 @@ public class ExchangeRateService {
 				CompletableFuture
 					.supplyAsync(() -> googleFinanceScraper.getExchangeRate(fromCurrency, toCurrency))
 					.orTimeout(CACHE_EXPIRY_TIME, TimeUnit.MILLISECONDS))
+
 			.thenApply(result -> new BigDecimal(result.toString())
-						.setScale(2, RoundingMode.CEILING))
-					.thenApply(exchangeRate -> {
+				.setScale(2, RoundingMode.CEILING))
+			.thenApply(exchangeRate -> {
 				updateExchangeRateStatus(fromCurrency, exchangeRate);
 
 				log.info("[Fallback] {} 환율 {} 업데이트, {}",

@@ -25,6 +25,10 @@
 - 2차 호출: [manana oepn api](https://api.manana.kr/exchange) & [구글 web scraping](https://www.google.com/finance/quote/USD-KRW) 동시 수행
 - 1차 호출에서 이미 시간 소요되었으므로 2차 호출에서 동시 수행해 먼저 오는 응답으로 로컬 캐시 업데이트
 
+### CompletableFuture 기반 Open API 호출
+- 2차 호출에서 manana open api & 구글 web scraping 동시 수행
+- 2차 호출에서 동시 수행해 먼저 오는 응답으로 로컬 캐시 업데이트하기 위해 CompletableFuture 사용해 비동기 처리
+
 <br>
 
 ## 현재 문제점 🤔

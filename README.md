@@ -16,8 +16,8 @@
 - ReentrantLock으로 Open API 호출 제한한 이유
     - 이유1: 여러 요청이 동시에 Open API로 USD 환율을 요청해도 같은 데이터를 가져올 가능성 높음
     - 이유2: Open API 다수 호출 시 호출 제한걸려 Forbidden 에러 응답받으면, 일정 시간 동안 실시간 환율 데이터 응답 못 받으므로 호출 제한 필요
-- ReentrantLock 잡은 스레드만 환율 Open API 호출해 로컬 캐시 업데이트
-- ReentrantLock 잡지 못한 스레드는 로컬 캐시 바라보면서 ReentrantLock 잡은 스레드에 의해 로컬 캐시 업데이트 상태 지속 확인 (while 문)
+- [ReentrantLock 잡은 스레드만 환율 Open API 호출](https://github.com/imzero238/exchange-rate-open-api-test/blob/main/src/main/java/com/nayoung/exchangerateopenapitest/domain/exchangerate/ExchangeRateService.java#L44)해 로컬 캐시 업데이트
+- ReentrantLock 잡지 못한 스레드는 로컬 캐시 바라보면서 ReentrantLock 잡은 스레드에 의해 로컬 캐시 업데이트 상태 지속 확인 ([while 문](https://github.com/imzero238/exchange-rate-open-api-test/blob/main/src/main/java/com/nayoung/exchangerateopenapitest/domain/transaction/service/TransactionService.java#L44))
 
 ### 단계적 호출
 - 호출 제한에 대비하기 위해 단계적 호출 설계

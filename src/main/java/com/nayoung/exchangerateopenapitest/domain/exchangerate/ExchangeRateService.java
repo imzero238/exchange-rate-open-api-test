@@ -41,38 +41,42 @@ public class ExchangeRateService {
 		}
 
 		ReentrantLock lock = currencyLocks.computeIfAbsent(fromCurrency, k -> new ReentrantLock());
-		if(lock.tryLock()) {
-			try {
-				// double checking
-				if (isAvailableExchangeRate(fromCurrency, toCurrency)) {
-					return;
+//		try {
+			if (lock.tryLock()) {  // TODO: tryLock(500, TimeUnit.MILLISECONDS) 설정
+				try {
+					// double checking
+					if (isAvailableExchangeRate(fromCurrency, toCurrency)) {
+						return;
+					}
+
+					CompletableFuture
+						.supplyAsync(() -> naverService.getExchangeRate(fromCurrency, toCurrency))
+						.orTimeout(CACHE_EXPIRY_TIME, TimeUnit.MILLISECONDS)
+						.thenApply(result -> new BigDecimal(result.toString())
+							.setScale(2, RoundingMode.CEILING))
+						.thenApply(exchangeRate -> {
+							updateExchangeRateStatus(fromCurrency, exchangeRate);
+
+							log.info("[Main(Naver)] {} 환율 {} 업데이트, {}",
+								fromCurrency,
+								exchangeRate,
+								formatter.format(Instant.ofEpochMilli(exchangeRateResults.get(fromCurrency).lastCachedTime)));
+							return exchangeRate;
+						})
+						.exceptionally(ex -> {
+							log.error("Naver API failed or timed out, calling Manana and Google... {}", ex.getMessage());
+							fallbackUpdate(fromCurrency, toCurrency);
+							return null;
+						}).join();
+				} finally {
+					lock.unlock();
 				}
-
-				CompletableFuture
-					.supplyAsync(() -> naverService.getExchangeRate(fromCurrency, toCurrency))
-					.orTimeout(CACHE_EXPIRY_TIME, TimeUnit.MILLISECONDS)
-					.thenApply(result -> new BigDecimal(result.toString())
-						.setScale(2, RoundingMode.CEILING))
-					.thenApply(exchangeRate -> {
-						updateExchangeRateStatus(fromCurrency, exchangeRate);
-
-						log.info("[Main(Naver)] {} 환율 {} 업데이트, {}",
-							fromCurrency,
-							exchangeRate,
-							formatter.format(Instant.ofEpochMilli(exchangeRateResults.get(fromCurrency).lastCachedTime)));
-						return exchangeRate;
-					})
-					.exceptionally(ex -> {
-						log.error("Naver API failed or timed out, calling Manana and Google... {}", ex.getMessage());
-						fallbackUpdate(fromCurrency, toCurrency);
-						return null;
-					}).join();
-			} finally {
-				lock.unlock();
+			} else {
+				log.info("다른 스레드에 의해 {} 단위가 업데이트 중입니다.", fromCurrency);
 			}
-		} else {
-			log.info("다른 스레드에 의해 {} 단위가 업데이트 중입니다.", fromCurrency);
-		}
+//		} catch (InterruptedException e) {
+//			log.error("{} ReentrantLock 획득 중 스레드 인터럽트 발생: {}", fromCurrency, e.getMessage());
+//		}
 	}
 
 	private void fallbackUpdate(Currency fromCurrency, Currency toCurrency) {

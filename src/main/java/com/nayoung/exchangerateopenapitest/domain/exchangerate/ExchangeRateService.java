@@ -139,7 +139,7 @@ public class ExchangeRateService {
 				}
 				else {
 					if(!condition.await(AWAIT_TIMEOUT, TimeUnit.MILLISECONDS)) {
-						log.warn("{} 환율 업데이트 대기 중 타임아웃 발생", fromCurrency);
+						log.warn("[await timeout] {} 환율 업데이트 대기 중 타임아웃 발생", fromCurrency);
 						throw new InterruptedException();
 					}
 				}

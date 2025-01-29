@@ -39,7 +39,7 @@ public class TransactionService {
 			try {
 				exchangeRate = exchangeRateService.getLatestExchangeRate(receiverAccount.getCurrency(), senderAccount.getCurrency());
 			} catch (Exception e) {
-				log.warn("[ Timeout ] 현재 실시간 환율을 이용할 수 없습니다. " + Thread.currentThread().getName());
+				log.warn("[timeout] 현재 실시간 환율을 이용할 수 없습니다.");
 				throw new RuntimeException("현재 실시간 환율을 이용할 수 없습니다.");
 			}
 		}

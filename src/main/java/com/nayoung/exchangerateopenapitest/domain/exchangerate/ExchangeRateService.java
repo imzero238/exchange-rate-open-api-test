@@ -9,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -72,8 +71,6 @@ public class ExchangeRateService {
 			return CompletableFuture
 				.supplyAsync(() -> naverService.getExchangeRate(fromCurrency, toCurrency))
 				.orTimeout(OPEN_API_TIMEOUT, TimeUnit.MILLISECONDS)
-				.thenApply(result -> new BigDecimal(result.toString())
-					.setScale(2, RoundingMode.CEILING))
 				.thenApply(exchangeRate -> {
 					updateExchangeRateStatus(fromCurrency, exchangeRate);
 
@@ -103,10 +100,9 @@ public class ExchangeRateService {
 
 				CompletableFuture
 					.supplyAsync(() -> googleFinanceScraper.getExchangeRate(fromCurrency, toCurrency))
-					.orTimeout(OPEN_API_TIMEOUT, TimeUnit.MILLISECONDS))
-
-			.thenApply(result -> new BigDecimal(result.toString())
-				.setScale(2, RoundingMode.CEILING))
+					.orTimeout(OPEN_API_TIMEOUT, TimeUnit.MILLISECONDS)
+			)
+			.thenApply(result -> new BigDecimal(result.toString()))
 			.thenApply(exchangeRate -> {
 				updateExchangeRateStatus(fromCurrency, exchangeRate);
 

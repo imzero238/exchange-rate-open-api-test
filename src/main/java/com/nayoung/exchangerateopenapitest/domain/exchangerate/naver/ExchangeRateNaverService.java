@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Service
 @RequiredArgsConstructor
@@ -61,6 +62,6 @@ public class ExchangeRateNaverService {
 
 	private BigDecimal convertToBigDecimal(String value) {
 		value = value.replace(",", "");
-		return new BigDecimal(value);
+		return new BigDecimal(value).setScale(2, RoundingMode.CEILING);
 	}
 }

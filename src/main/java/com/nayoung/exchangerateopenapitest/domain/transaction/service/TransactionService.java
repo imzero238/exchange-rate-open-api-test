@@ -36,33 +36,9 @@ public class TransactionService {
 			exchangeRate = new BigDecimal(1);
 		}
 		else {
-			long currentTime = System.currentTimeMillis();
-			long timeout = 4000;
-			long endTime = currentTime + timeout;
-
-			boolean timeoutFlag = true;
-			while (System.currentTimeMillis() < endTime) {
-				// 로컬 캐시 사용
-				if (exchangeRateService.isAvailableExchangeRate(receiverAccount.getCurrency(), senderAccount.getCurrency())) {
-					exchangeRate = exchangeRateService.getExchangeRate(receiverAccount.getCurrency(), senderAccount.getCurrency());
-					timeoutFlag = false;
-					break;
-				}
-
-				// 실시간 환율 데이터 업데이트 (스레드 1개로 제한)
-				exchangeRateService.updateExchangeRate(receiverAccount.getCurrency(), senderAccount.getCurrency());
-
-				try {
-					if (!exchangeRateService.isAvailableExchangeRate(receiverAccount.getCurrency(), senderAccount.getCurrency())) {
-						Thread.sleep(150);
-					}
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-					throw new RuntimeException("환율 조회 중 인터럽트 발생", e);
-				}
-			}
-
-			if (timeoutFlag || exchangeRate.compareTo(BigDecimal.ZERO) <= 0) {
+			try {
+				exchangeRate = exchangeRateService.getLatestExchangeRate(receiverAccount.getCurrency(), senderAccount.getCurrency());
+			} catch (Exception e) {
 				log.warn("[ Timeout ] 현재 실시간 환율을 이용할 수 없습니다. " + Thread.currentThread().getName());
 				throw new RuntimeException("현재 실시간 환율을 이용할 수 없습니다.");
 			}

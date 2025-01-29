@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 @Service
@@ -28,67 +29,81 @@ public class ExchangeRateService {
 	private final ExchangeRateMananaService mananaService;
 	private final ExchangeRateGoogleFinanceScraper googleFinanceScraper;
 
-	private final ConcurrentHashMap<Currency, ReentrantLock> currencyLocks = new ConcurrentHashMap<>();
+	private final Map<Currency, ReentrantLock> currencyLocks = new ConcurrentHashMap<>();
+	private final Map<Currency, Condition> currencyConditions = new ConcurrentHashMap<>();
 	private final Map<Currency, ExchangeRateStatus> exchangeRateResults = new ConcurrentHashMap<>();
-	private final long CACHE_EXPIRY_TIME = 2000;
 
-	private DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+	private final long CACHE_EXPIRY_TIME = 2000;
+	private final long OPEN_API_TIMEOUT = 2000;
+	private final long AWAIT_TIMEOUT = 4500;
+
+	private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 		.withZone(ZoneId.systemDefault());
 
-	public void updateExchangeRate(Currency fromCurrency, Currency toCurrency) {
+	public BigDecimal getLatestExchangeRate(Currency fromCurrency, Currency toCurrency) {
 		if(isAvailableExchangeRate(fromCurrency, toCurrency)) {
-			return;
+			return exchangeRateResults.get(fromCurrency).exchangeRate;
 		}
 
 		ReentrantLock lock = currencyLocks.computeIfAbsent(fromCurrency, k -> new ReentrantLock());
-//		try {
-			if (lock.tryLock()) {  // TODO: tryLock(500, TimeUnit.MILLISECONDS) 설정
-				try {
-					// double checking
-					if (isAvailableExchangeRate(fromCurrency, toCurrency)) {
-						return;
-					}
-
-					CompletableFuture
-						.supplyAsync(() -> naverService.getExchangeRate(fromCurrency, toCurrency))
-						.orTimeout(CACHE_EXPIRY_TIME, TimeUnit.MILLISECONDS)
-						.thenApply(result -> new BigDecimal(result.toString())
-							.setScale(2, RoundingMode.CEILING))
-						.thenApply(exchangeRate -> {
-							updateExchangeRateStatus(fromCurrency, exchangeRate);
-
-							log.info("[Main(Naver)] {} 환율 {} 업데이트, {}",
-								fromCurrency,
-								exchangeRate,
-								formatter.format(Instant.ofEpochMilli(exchangeRateResults.get(fromCurrency).lastCachedTime)));
-							return exchangeRate;
-						})
-						.exceptionally(ex -> {
-							log.error("Naver API failed or timed out, calling Manana and Google... {}", ex.getMessage());
-							fallbackUpdate(fromCurrency, toCurrency);
-							return null;
-						}).join();
-				} finally {
-					lock.unlock();
-				}
+		try {
+			if (lock.tryLock(500, TimeUnit.MILLISECONDS)) {
+				return fetchPrimaryExchangeRate(fromCurrency, toCurrency);
 			} else {
-				log.info("다른 스레드에 의해 {} 단위가 업데이트 중입니다.", fromCurrency);
+				return monitorExchangeRateUpdate(fromCurrency, toCurrency);
 			}
-//		} catch (InterruptedException e) {
-//			log.error("{} ReentrantLock 획득 중 스레드 인터럽트 발생: {}", fromCurrency, e.getMessage());
-//		}
+		} catch (InterruptedException e) {
+			log.error("{} ReentrantLock 획득 중 스레드 인터럽트 발생: {}", fromCurrency, e.getMessage());
+			Thread.currentThread().interrupt();
+			throw new RuntimeException(e);
+		}
 	}
 
-	private void fallbackUpdate(Currency fromCurrency, Currency toCurrency) {
-		CompletableFuture
+	private BigDecimal fetchPrimaryExchangeRate(Currency fromCurrency, Currency toCurrency) {
+		ReentrantLock lock = currencyLocks.get(fromCurrency);
+		Condition condition = currencyConditions.computeIfAbsent(fromCurrency, k -> lock.newCondition());
+
+		try {
+			// double checking
+			if (isAvailableExchangeRate(fromCurrency, toCurrency)) {
+				return exchangeRateResults.get(fromCurrency).exchangeRate;
+			}
+
+			return CompletableFuture
+				.supplyAsync(() -> naverService.getExchangeRate(fromCurrency, toCurrency))
+				.orTimeout(OPEN_API_TIMEOUT, TimeUnit.MILLISECONDS)
+				.thenApply(result -> new BigDecimal(result.toString())
+					.setScale(2, RoundingMode.CEILING))
+				.thenApply(exchangeRate -> {
+					updateExchangeRateStatus(fromCurrency, exchangeRate);
+
+					log.info("[Main(Naver)] {} 환율 {} 업데이트, {}",
+						fromCurrency,
+						exchangeRate,
+						formatter.format(Instant.ofEpochMilli(exchangeRateResults.get(fromCurrency).lastCachedTime)));
+
+					return exchangeRate;
+				})
+				.exceptionally(ex -> {
+					log.error("Naver API failed or timed out, calling Manana and Google... {}", ex.getMessage());
+					return fetchFallbackExchangeRate(fromCurrency, toCurrency);
+				}).join();
+		} finally {
+			condition.signalAll();
+			lock.unlock();
+		}
+	}
+
+	private BigDecimal fetchFallbackExchangeRate(Currency fromCurrency, Currency toCurrency) {
+		return CompletableFuture
 			.anyOf(
 				CompletableFuture
 					.supplyAsync(() -> mananaService.getExchangeRate(fromCurrency, toCurrency))
-					.orTimeout(CACHE_EXPIRY_TIME, TimeUnit.MILLISECONDS),
+					.orTimeout(OPEN_API_TIMEOUT, TimeUnit.MILLISECONDS),
 
 				CompletableFuture
 					.supplyAsync(() -> googleFinanceScraper.getExchangeRate(fromCurrency, toCurrency))
-					.orTimeout(CACHE_EXPIRY_TIME, TimeUnit.MILLISECONDS))
+					.orTimeout(OPEN_API_TIMEOUT, TimeUnit.MILLISECONDS))
 
 			.thenApply(result -> new BigDecimal(result.toString())
 				.setScale(2, RoundingMode.CEILING))
@@ -109,22 +124,48 @@ public class ExchangeRateService {
 			.join();
 	}
 
+	private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toCurrency) throws InterruptedException {
+		// double checking
+		if(isAvailableExchangeRate(fromCurrency, toCurrency)) {
+			return exchangeRateResults.get(fromCurrency).exchangeRate;
+		}
+
+		log.info("다른 스레드에 의해 {} 단위가 업데이트 중입니다.", fromCurrency);
+
+		ReentrantLock lock = currencyLocks.get(fromCurrency);
+		Condition condition = currencyConditions.computeIfAbsent(fromCurrency, k -> lock.newCondition());
+
+		lock.lock();
+		try {
+			while (!isAvailableExchangeRate(fromCurrency, toCurrency)) {
+				if(lock.isHeldByCurrentThread()) {
+					return fetchPrimaryExchangeRate(fromCurrency, toCurrency);
+				}
+				else {
+					if(!condition.await(AWAIT_TIMEOUT, TimeUnit.MILLISECONDS)) {
+						log.warn("{} 환율 업데이트 대기 중 타임아웃 발생", fromCurrency);
+						throw new InterruptedException();
+					}
+				}
+			}
+			return exchangeRateResults.get(fromCurrency).exchangeRate;
+		} finally {
+			lock.unlock();
+		}
+	}
+
 	private void updateExchangeRateStatus(Currency fromCurrency, BigDecimal exchangeRate) {
 		ExchangeRateStatus status = exchangeRateResults.computeIfAbsent(fromCurrency, k -> new ExchangeRateStatus());
 		status.exchangeRate = exchangeRate;
 		status.lastCachedTime = System.currentTimeMillis();
 	}
 
-	public boolean isAvailableExchangeRate(Currency fromCurrency, Currency toCurrency) {
+	private boolean isAvailableExchangeRate(Currency fromCurrency, Currency toCurrency) {
 		return exchangeRateResults.containsKey(fromCurrency)
 			&& System.currentTimeMillis() - exchangeRateResults.get(fromCurrency).lastCachedTime < CACHE_EXPIRY_TIME;
 	}
 
-	public BigDecimal getExchangeRate(Currency fromCurrency, Currency toCurrency) {
-		return exchangeRateResults.get(fromCurrency).exchangeRate;
-	}
-
-	class ExchangeRateStatus {
+	static class ExchangeRateStatus {
 		BigDecimal exchangeRate;
 		Long lastCachedTime;
 

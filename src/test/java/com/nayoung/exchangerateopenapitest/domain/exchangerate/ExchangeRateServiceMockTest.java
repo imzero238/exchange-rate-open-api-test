@@ -37,7 +37,7 @@ class ExchangeRateServiceMockTest {
 		for(int i = 0; i < threadCount; i++) {
 			executorService.submit(() -> {
 				try {
-					exchangeRateService.updateExchangeRate(Currency.USD, Currency.KRW);
+					exchangeRateService.getLatestExchangeRate(Currency.USD, Currency.KRW);
 				} finally {
 					countDownLatch.countDown();
 				}

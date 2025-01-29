@@ -28,13 +28,14 @@ public class ExchangeRateService {
 	private final ExchangeRateMananaService mananaService;
 	private final ExchangeRateGoogleFinanceScraper googleFinanceScraper;
 
-	private final Map<Currency, ReentrantLock> currencyLocks = new ConcurrentHashMap<>();
-	private final Map<Currency, Condition> currencyConditions = new ConcurrentHashMap<>();
-	private final Map<Currency, ExchangeRateStatus> exchangeRateResults = new ConcurrentHashMap<>();
+	private static final Map<Currency, ReentrantLock> currencyLocks = new ConcurrentHashMap<>();
+	private static final Map<Currency, Condition> currencyConditions = new ConcurrentHashMap<>();
+	private static final Map<Currency, ExchangeRateStatus> exchangeRateResults = new ConcurrentHashMap<>();
 
-	private final long CACHE_EXPIRY_TIME = 2000;
-	private final long OPEN_API_TIMEOUT = 2000;
-	private final long AWAIT_TIMEOUT = 4500;
+	private static final long TRY_LOCK_TIMEOUT = 1;
+	private static final long CACHE_EXPIRY_TIME = 2000;
+	private static final long OPEN_API_TIMEOUT = 2000;
+	private static final long AWAIT_TIMEOUT = 4500;
 
 	private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 		.withZone(ZoneId.systemDefault());
@@ -46,7 +47,7 @@ public class ExchangeRateService {
 
 		ReentrantLock lock = currencyLocks.computeIfAbsent(fromCurrency, k -> new ReentrantLock());
 		try {
-			if (lock.tryLock(500, TimeUnit.MILLISECONDS)) {
+			if (lock.tryLock(TRY_LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
 				return fetchPrimaryExchangeRate(fromCurrency, toCurrency);
 			} else {
 				return monitorExchangeRateUpdate(fromCurrency, toCurrency);

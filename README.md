@@ -58,6 +58,8 @@ while 문 내부에서 여러 구현 방법으로 스레드 상태의 차이를 
 
 - RPS 최대: 120
 
+<br>
+
 ### sleep(1000)
 
 구현 설명: ReentrantLock을 잡지 못한 스레드는 sleep(1000) 간격으로 while 문을 계속 돌며 로컬 캐시 상태 확인
@@ -70,7 +72,9 @@ while 문 내부에서 여러 구현 방법으로 스레드 상태의 차이를 
 ![](/img/rps_sleep_1000.png)
 
 - RPS 최대: 140
-- spin lock 방식과의 RPS의 차이도 크지 않음
+- spin lock 방식과의 RPS 차이도 크지 않음
+
+<br>
 
 ### CV (await & signalAll)
 
@@ -79,15 +83,20 @@ while 문 내부에서 여러 구현 방법으로 스레드 상태의 차이를 
 ![](/img/cpu_usage_cv.png)
 
 - 시스템 CPU 사용률(mean): 0.176
+- sleep(100) 방식과의 CPU 사용률 차이가 크지 않음
 
 ![](/img/rps_cv.png)
 
 - RPS 최대: 200
 - spin lock, sleep 방식보다 RPS 증가
 
+<br>
+
 ### Virtual Thread
 
 - 예정
+
+<br>
 
 ### HTTP Request failed
 ![](/img/http_server_requests_count.png)

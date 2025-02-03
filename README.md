@@ -78,12 +78,12 @@ private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toC
 	}
 }
 ```
-- https://드ithub.com/imzero238/exchange-rate-open-api-test/blob/feat/add-cv/src/main/java/com/nayoung/exchangerateopenapitest/domain/exchangerate/ExchangeRateService.java
-
+- https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-cv/src/main/java/com/nayoung/exchangerateopenapitest/domain/exchangerate/ExchangeRateService.java
 - 구현 의도대로 1개의 스레드만 Open API를 호출하지만
 - 생산자, 소비자 모두 같은 락을 획득하려고 하기 떄문에, 소비자는 await 지점에서 대기하는 것이 아니라 lock.lock() 지점에서 대기
 - 즉, 이론으로 배웠던 생산자, 소비자 문제(누가 먼저 공유 자원에 접근하는지 파악 불가)와 다르게 생산자가 무조건 lock을 먼저 획득한다는 차이
 - 이 코드에선 await가 필요하지 않을 수 있다고 판단해 방법 2로 변경했습니다!
+<br>
 
 - [소비자 await 코드 라인](https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-cv/src/main/java/com/nayoung/exchangerateopenapitest/domain/exchangerate/ExchangeRateService.java#L142) 위 링크와 같습니다.
 - [생산자 signalAll 코드 라인](https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-cv/src/main/java/com/nayoung/exchangerateopenapitest/domain/exchangerate/ExchangeRateService.java#L90) 위 링크와 같습니다.

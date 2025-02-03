@@ -66,7 +66,11 @@ private BigDecimal fetchPrimaryExchangeRate(Currency fromCurrency, Currency toCu
 	}
 }
 
-// ReentrantLock 못 잡은 소비자 스레드, 생산자 스레드의 작업을 기다리며 업데이트된 값 읽고 모든 로직 탈출 (Open API 호출 안 함)
+/*
+    ReentrantLock 못 잡은 소비자 스레드
+    생산자 스레드의 작업을 기다리며 업데이트된 값 읽고 모든 로직 탈출
+    Open API 호출하지 않음
+ */
 private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toCurrency, ReentrantLock lock, Condition condition) throws InterruptedException {
 	lock.lock();
 	try {
@@ -78,7 +82,8 @@ private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toC
 	}
 }
 ```
-- https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-cv/src/main/java/com/nayoung/exchangerateopenapitest/domain/exchangerate/ExchangeRateService.java
+https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-cv/src/main/java/com/nayoung/exchangerateopenapitest/domain/exchangerate/ExchangeRateService.java
+
 - 구현 의도대로 1개의 스레드만 Open API를 호출하지만
 - 생산자, 소비자 모두 같은 락을 획득하려고 하기 떄문에, 소비자는 await 지점에서 대기하는 것이 아니라 lock.lock() 지점에서 대기
 - 즉, 이론으로 배웠던 생산자, 소비자 문제(누가 먼저 공유 자원에 접근하는지 파악 불가)와 다르게 생산자가 무조건 lock을 먼저 획득한다는 차이
@@ -93,7 +98,7 @@ private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toC
 ### 방법2: lock 없이 condition await (add-synchronized-condition 브랜치)
 
 ```java
-// 소비자 스레
+// ReentrantLock 못 잡은 소비자 스레드
 private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toCurrency, ReentrantLock lock, Condition condition) throws InterruptedException {
 	// lock.lock();
 	try {
@@ -107,13 +112,18 @@ private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toC
 	}
 }
 ```
-- https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-synchronized-condition/src/main/java/com/nayoung/exchangerateopenapitest/domain/exchangerate/ExchangeRateService.java#L142
-- lock 없이 condition wait을 호출
+https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-synchronized-condition/src/main/java/com/nayoung/exchangerateopenapitest/domain/exchangerate/ExchangeRateService.java#L142
+
+lock 없이 condition wait을 호출
+- 소비자가 wake up 하자마다 ReentrantLock 잡을 필요 없음
+- ReentrantLock 잡은 생산자 스레드가 업데이트한 값만 읽고 탈출하면 됨
+
+synchronized 블록
 - lock 없이 await 호출해서 IllegalMonitorStateException 발생 -> synchronized 블록 추가
 - synchronized 블록 들어와 바로 wait 호출하므로 여러 소비자 스레드 synchronized 블록 내부에서 대기 (동기화 안 됨)
-<br>
-
 - 모든 소비자 스레드가 함께 대기하다가 같이 깨어나도 되니, 동기화 필요 없음
+
+고민
 - 하지만 synchronized 키워드를 사용하고 있는데 동기화하지 않는다....? 
 - synchronized + condition(lock 없이) 조합...? (condition은 lock과 함께 사용하는 것으로 알고 있습니다.)
 - 이 코드는 기술의 특성을 잘 살리지 못한 것 같아서 방법 3으로 변경했습니다!
@@ -158,15 +168,15 @@ private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toC
             // 이후 코드 생략
 }
 ```
+https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-future-complete-get/src/main/java/com/nayoung/exchangerateopenapitest/domain/exchangerate/ExchangeRateService.java#L136
 
-- https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-future-complete-get/src/main/java/com/nayoung/exchangerateopenapitest/domain/exchangerate/ExchangeRateService.java#L136
-- condition 제거하고
+condition 제거하고
 - 소비자는 CompletableFuture.get 에서 대기 (timeout 설정으로 orTimeout 작성)
-- 생산자는 CompletableFuture.complete 호출
+- 생산자는 CompletableFuture.complete 호출하는 방법으로 변경했습니다.
 
-하는 방법으로 변경했습니다. <br>
+<br>
 
-모든 코드 구현 의도대로 1개의 스레드만 Open API를 호출하고
+방법 1 ~ 3 모두 구현 의도대로 1개의 스레드만 Open API를 호출하고
 - 나머지 스레드는 모두 대기하다가 로컬 캐시 or 생산자로 값을 전달받아 Open API 호출 없이 로직 탈출합니다.
-- 하지만 대기하는 스레드가 어느 지점에서 대기하는가.. 기술의 특성은 잘 살리고 있는지를 고민하다 보니 해당 과정까지 오게 되었습니다.
+- 하지만 대기하는 스레드가 어느 지점에서 대기하는가.. 기술의 특성은 잘 살리고 있는가...를 고민하다 보니 해당 과정까지 오게 되었습니다.
 - 방법 1 ~ 3 과정까지 진행하면서 놓친 부분이 있는지, 최종 코드인 방법 3에서 잘못된 점은 없는지 피드백 받고 싶습니다! 

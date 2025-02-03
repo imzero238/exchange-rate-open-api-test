@@ -56,8 +56,13 @@ public BigDecimal getLatestExchangeRate(Currency fromCurrency, Currency toCurren
 	}
 }
 
-// ReentrantLock을 잡은 생산자 스레드
-private BigDecimal fetchPrimaryExchangeRate(Currency fromCurrency, Currency toCurrency, ReentrantLock lock, Condition condition) {
+/*
+    ReentrantLock을 잡은 생산자 스레드
+    작업 후 signalAll로 sleep 상태 스레드 깨움
+ */
+private BigDecimal fetchPrimaryExchangeRate(Currency fromCurrency, Currency toCurrency, 
+                                            ReentrantLock lock, Condition condition) {
+	
 	try {
 		// 환율 Open API 호출
 	} finally {
@@ -71,7 +76,9 @@ private BigDecimal fetchPrimaryExchangeRate(Currency fromCurrency, Currency toCu
     생산자 스레드의 작업을 기다리며 업데이트된 값 읽고 모든 로직 탈출
     Open API 호출하지 않음
  */
-private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toCurrency, ReentrantLock lock, Condition condition) throws InterruptedException {
+private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toCurrency,
+                                             ReentrantLock lock, Condition condition) throws InterruptedException {
+	
 	lock.lock();
 	try {
 		while (!isAvailableExchangeRate(fromCurrency, toCurrency)) {
@@ -85,7 +92,7 @@ private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toC
 https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-cv/src/main/java/com/nayoung/exchangerateopenapitest/domain/exchangerate/ExchangeRateService.java
 
 - 구현 의도대로 1개의 스레드만 Open API를 호출하지만
-- 생산자, 소비자 모두 같은 락을 획득하려고 하기 떄문에, 소비자는 await 지점에서 대기하는 것이 아니라 lock.lock() 지점에서 대기
+- 생산자, 소비자 모두 같은 락을 획득하려고 하니, 소비자는 await 지점에서 대기하는 것이 아니라 lock.lock() 지점에서 대기
 - 즉, 이론으로 배웠던 생산자, 소비자 문제(누가 먼저 공유 자원에 접근하는지 파악 불가)와 다르게 생산자가 무조건 lock을 먼저 획득한다는 차이
 - 이 코드에선 await가 필요하지 않을 수 있다고 판단해 방법 2로 변경했습니다!
 <br>
@@ -98,8 +105,14 @@ https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-cv/src/ma
 ### 방법2: lock 없이 condition await (add-synchronized-condition 브랜치)
 
 ```java
-// ReentrantLock 못 잡은 소비자 스레드
-private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toCurrency, ReentrantLock lock, Condition condition) throws InterruptedException {
+/*
+    ReentrantLock 못 잡은 소비자 스레드
+    생산자 스레드의 작업을 기다리며 업데이트된 값 읽고 모든 로직 탈출
+    Open API 호출하지 않음
+ */
+private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toCurrency, 
+                                             ReentrantLock lock, Condition condition) throws InterruptedException {
+	
 	// lock.lock();
 	try {
 		while (!isAvailableExchangeRate(fromCurrency, toCurrency)) {
@@ -148,8 +161,12 @@ public BigDecimal getLatestExchangeRate(Currency fromCurrency, Currency toCurren
 	}
 }
 
-// ReentrantLock을 잡은 생산자 스레드
-private BigDecimal fetchPrimaryExchangeRate(Currency fromCurrency, Currency toCurrency, ReentrantLock lock, CompletableFuture<BigDecimal> future) {
+/*
+    ReentrantLock을 잡은 생산자 스레드
+    작업 후 future.complete로 sleep 상태 스레드 깨움
+ */
+private BigDecimal fetchPrimaryExchangeRate(Currency fromCurrency, Currency toCurrency, 
+                                            ReentrantLock lock, CompletableFuture<BigDecimal> future) {
 	try {
 		// 환율 Open API 호출
                 future.complete(latestExchangeRate);
@@ -158,8 +175,13 @@ private BigDecimal fetchPrimaryExchangeRate(Currency fromCurrency, Currency toCu
 	}
 }
 
-// ReentrantLock 못 잡은 소비자 스레드, 생산자 스레드의 작업을 기다리며 업데이트된 값 읽고 모든 로직 탈출
-private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toCurrency, ReentrantLock lock, CompletableFuture<BigDecimal> future) throws InterruptedException {
+/*
+    ReentrantLock 못 잡은 소비자 스레드
+    생산자 스레드의 작업을 기다리며 업데이트된 값 읽고 모든 로직 탈출
+    Open API 호출하지 않음
+ */
+private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toCurrency, 
+                                             ReentrantLock lock, CompletableFuture<BigDecimal> future) throws InterruptedException {
 	return future.orTimeout(FUTURE_TIMEOUT, TimeUnit.MILLISECONDS)
             .thenApply(result -> {
 				log.info("업데이트된 환율({}, {}) 사용", fromCurrency, result);

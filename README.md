@@ -133,11 +133,12 @@ lock 없이 condition wait을 호출
 
 synchronized 블록
 - lock 없이 await 호출해서 IllegalMonitorStateException 발생 -> synchronized 블록 추가
-- synchronized 블록 들어와 바로 wait 호출하므로 여러 소비자 스레드 synchronized 블록 내부에서 대기 (동기화 안 됨)
+- synchronized 블록 들어와 바로 wait 호출하므로 여러 소비자 스레드 synchronized 블록 내부에서 대기 ~~(동기화 안 됨)~~
 - 모든 소비자 스레드가 함께 대기하다가 같이 깨어나도 되니, 동기화 필요 없음
 
 고민
-- 하지만 synchronized 키워드를 사용하고 있는데 동기화하지 않는다....? 
+- ~~하지만 synchronized 키워드를 사용하고 있는데 동기화하지 않는다....?~~
+  - 동기화가 안 되는 것이 아니라 wait을 하면 condition 모니터 락을 반납하니 여러 소비자 스레드 synchronized 블록 내부에서 대기
 - synchronized + condition(lock 없이) 조합...? (condition은 lock과 함께 사용하는 것으로 알고 있습니다.)
 - 이 코드는 기술의 특성을 잘 살리지 못한 것 같아서 방법 3으로 변경했습니다!
 

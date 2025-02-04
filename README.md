@@ -102,7 +102,7 @@ https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-cv/src/ma
 
 <br>
 
-### 방법2: lock 없이 condition await (add-synchronized-condition 브랜치)
+### 방법2: wait & notifyAll (add-synchronized-condition 브랜치)
 
 ```java
 /*
@@ -127,19 +127,18 @@ private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toC
 ```
 https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-synchronized-condition/src/main/java/com/nayoung/exchangerateopenapitest/domain/exchangerate/ExchangeRateService.java#L142
 
-lock 없이 condition wait을 호출
+lock 없이 Object.wait 호출
 - 소비자가 wake up 하자마다 ReentrantLock 잡을 필요 없음
 - ReentrantLock 잡은 생산자 스레드가 업데이트한 값만 읽고 탈출하면 됨
 
 synchronized 블록
-- lock 없이 await 호출해서 IllegalMonitorStateException 발생 -> synchronized 블록 추가
-- synchronized 블록 들어와 바로 wait 호출하므로 여러 소비자 스레드 synchronized 블록 내부에서 대기 ~~(동기화 안 됨)~~
-- 모든 소비자 스레드가 함께 대기하다가 같이 깨어나도 되니, 동기화 필요 없음
+- lock 없이 await 호출해서 IllegalMonitorStateException 발생 -> synchronized 블록 추가 및 Object.wait 으로 변경
+- synchronized 블록 들어와 바로 wait 호출하므로 여러 소비자 스레드 synchronized 블록 내부에서 대기 (Object에 대한 모니터 락 바로 반납)
 
 고민
-- ~~하지만 synchronized 키워드를 사용하고 있는데 동기화하지 않는다....?~~
-  - 동기화가 안 되는 것이 아니라 wait을 하면 condition 모니터 락을 반납하니 여러 소비자 스레드 synchronized 블록 내부에서 대기
 - synchronized + condition(lock 없이) 조합...? (condition은 lock과 함께 사용하는 것으로 알고 있습니다.)
+- condition의 await 대신 wait을 사용...?
+- condition 기능을 사용하지 않으니 다른 Object 생성...?
 - 이 코드는 기술의 특성을 잘 살리지 못한 것 같아서 방법 3으로 변경했습니다!
 
 <br>

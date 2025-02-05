@@ -106,18 +106,32 @@ https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-cv/src/ma
 
 ```java
 /*
+    ReentrantLock을 잡은 생산자 스레드
+    작업 후 object.notifyAll로 sleep 상태 스레드 깨움
+ */
+private BigDecimal fetchPrimaryExchangeRate(Currency fromCurrency, Currency toCurrency,
+                                            ReentrantLock lock, Object object) {
+	try {
+		// 환율 Open API 호출 후 
+                object.notifyAll();
+	} finally {
+		lock.unlock();
+	}
+}
+
+/*
     ReentrantLock 못 잡은 소비자 스레드
     생산자 스레드의 작업을 기다리며 업데이트된 값 읽고 모든 로직 탈출
     Open API 호출하지 않음
  */
 private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toCurrency, 
-                                             ReentrantLock lock, Condition condition) throws InterruptedException {
+                                             ReentrantLock lock, Object object) throws InterruptedException {
 	
 	// lock.lock();
 	try {
 		while (!isAvailableExchangeRate(fromCurrency, toCurrency)) {
-			synchronized (condition) {
-				condition.wait(CONDITION_WAIT_TIMEOUT);
+			synchronized (object) {
+				object.wait(CONDITION_WAIT_TIMEOUT);
 			}
 		}
 	} finally {
@@ -125,7 +139,7 @@ private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toC
 	}
 }
 ```
-https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-synchronized-condition/src/main/java/com/nayoung/exchangerateopenapitest/domain/exchangerate/ExchangeRateService.java#L142
+https://github.com/imzero238/exchange-rate-open-api-test/blob/feat/add-object-notifyall-wait/src/main/java/com/nayoung/exchangerateopenapitest/domain/exchangerate/ExchangeRateService.java
 
 lock 없이 Object.wait 호출
 - 소비자가 wake up 하자마다 ReentrantLock 잡을 필요 없음
@@ -136,14 +150,13 @@ synchronized 블록
 - synchronized 블록 들어와 바로 wait 호출하므로 여러 소비자 스레드 synchronized 블록 내부에서 대기 (Object에 대한 모니터 락 바로 반납)
 
 고민
-- synchronized + condition(lock 없이) 조합...? (condition은 lock과 함께 사용하는 것으로 알고 있습니다.)
-- condition의 await 대신 wait을 사용...?
-- condition 기능을 사용하지 않으니 다른 Object 생성...?
+- ~~synchronized + condition(lock 없이) 조합...? (condition은 lock과 함께 사용하는 것으로 알고 있습니다.)~~
+- ~~condition의 await 대신 wait을 사용...?~~ -> condition 제거 후 object로 변경
 - 이 코드는 기술의 특성을 잘 살리지 못한 것 같아서 방법 3으로 변경했습니다!
 
 <br>
 
-### 방법3: condition 제거, CompletableFuture get & complete 사용 (add-future-complete-get 브랜치)
+### 방법3: CompletableFuture get & complete 사용 (add-future-complete-get 브랜치)
 
 ```java
 private static final Map<Currency, ReentrantLock> currencyLocks = new ConcurrentHashMap<>();
@@ -168,7 +181,7 @@ public BigDecimal getLatestExchangeRate(Currency fromCurrency, Currency toCurren
 private BigDecimal fetchPrimaryExchangeRate(Currency fromCurrency, Currency toCurrency, 
                                             ReentrantLock lock, CompletableFuture<BigDecimal> future) {
 	try {
-		// 환율 Open API 호출
+		// 환율 Open API 호출 후
                 future.complete(latestExchangeRate);
 	} finally {
 		lock.unlock();

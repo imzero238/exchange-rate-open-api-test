@@ -17,7 +17,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 @Service
@@ -30,13 +29,13 @@ public class ExchangeRateService {
 	private final ExchangeRateGoogleFinanceScraper googleFinanceScraper;
 
 	private static final Map<Currency, ReentrantLock> currencyLocks = new ConcurrentHashMap<>();
-	private static final Map<Currency, Condition> currencyConditions = new ConcurrentHashMap<>();
+	private static final Map<Currency, Object> currencyConditions = new ConcurrentHashMap<>();
 	private static final Map<Currency, ExchangeRateStatus> exchangeRateResults = new ConcurrentHashMap<>();
 
 	private static final long TRY_LOCK_TIMEOUT = 1;
 	private static final long CACHE_EXPIRY_TIME = 2000;
 	private static final long OPEN_API_TIMEOUT = 2000;
-	private static final long CONDITION_WAIT_TIMEOUT = 3000;
+	private static final long OBJECT_WAIT_TIMEOUT = 3000;
 
 	private DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 		.withZone(ZoneId.systemDefault());
@@ -47,12 +46,12 @@ public class ExchangeRateService {
 		}
 
 		ReentrantLock lock = currencyLocks.computeIfAbsent(fromCurrency, k -> new ReentrantLock());
-		Condition condition = currencyConditions.computeIfAbsent(fromCurrency, k -> lock.newCondition());
+		Object object = currencyConditions.computeIfAbsent(fromCurrency, k -> new Object());
 		try {
 			if (lock.tryLock(TRY_LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
-				return fetchPrimaryExchangeRate(fromCurrency, toCurrency, lock, condition);
+				return fetchPrimaryExchangeRate(fromCurrency, toCurrency, lock, object);
 			} else {
-				return monitorExchangeRateUpdate(fromCurrency, toCurrency, lock, condition);
+				return monitorExchangeRateUpdate(fromCurrency, toCurrency, lock, object);
 			}
 		} catch (InterruptedException e) {
 			log.error("{} ReentrantLock 획득 중 스레드 인터럽트 발생: {}", fromCurrency, e.getMessage());
@@ -61,7 +60,7 @@ public class ExchangeRateService {
 		}
 	}
 
-	private BigDecimal fetchPrimaryExchangeRate(Currency fromCurrency, Currency toCurrency, ReentrantLock lock, Condition condition) {
+	private BigDecimal fetchPrimaryExchangeRate(Currency fromCurrency, Currency toCurrency, ReentrantLock lock, Object object) {
 		try {
 			// double checking
 			if(isAvailableExchangeRate(fromCurrency, toCurrency)) {
@@ -88,8 +87,8 @@ public class ExchangeRateService {
 					return fetchFallbackExchangeRate(fromCurrency, toCurrency);
 				}).join();
 		} finally {
-			synchronized (condition) {
-				condition.notifyAll();
+			synchronized (object) {
+				object.notifyAll();
 			}
 			lock.unlock();
 		}
@@ -125,7 +124,7 @@ public class ExchangeRateService {
 			.join();
 	}
 
-	private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toCurrency, ReentrantLock lock, Condition condition) throws InterruptedException {
+	private BigDecimal monitorExchangeRateUpdate(Currency fromCurrency, Currency toCurrency, ReentrantLock lock, Object object) throws InterruptedException {
 		try {
 			// double checking
 			if(isAvailableExchangeRate(fromCurrency, toCurrency)) {
@@ -136,11 +135,11 @@ public class ExchangeRateService {
 
 			while (!isAvailableExchangeRate(fromCurrency, toCurrency)) {
 				if(lock.tryLock(TRY_LOCK_TIMEOUT, TimeUnit.MILLISECONDS)) {
-					return fetchPrimaryExchangeRate(fromCurrency, toCurrency, lock, condition);
+					return fetchPrimaryExchangeRate(fromCurrency, toCurrency, lock, object);
 				}
 				else {
-					synchronized (condition) {
-						condition.wait(CONDITION_WAIT_TIMEOUT);
+					synchronized (object) {
+						object.wait(OBJECT_WAIT_TIMEOUT);
 					}
 				}
 			}

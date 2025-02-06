@@ -76,19 +76,68 @@ while 문 내부에서 여러 구현 방법으로 스레드 상태의 차이를 
 
 <br>
 
-### CV (await & signalAll)
+### Condition await & signalAll
 
 구현 설명: ReentrantLock을 잡지 못한 스레드는 await 하다가, ReentrantLock을 잡은 스레드의 signal을 받고 일어나 로컬 캐시 상태 확인
 
-![](/img/cpu_usage_cv.png)
+#### CPU & memory
+![](/img/condition-cpu-memory.png)
 
-- 시스템 CPU 사용률(mean): 0.176
-- sleep(100) 방식과의 CPU 사용률 차이가 크지 않음
+- 시스템 CPU 사용률(mean): 0.440
+- ~~sleep(100) 방식과의 CPU 사용률 차이가 크지 않음~~
 
-![](/img/rps_cv.png)
+#### Requests per Second
 
-- RPS 최대: 200
-- spin lock, sleep 방식보다 RPS 증가
+![](/img/condition-rps.png)
+
+- RPS 최대: 320
+- ~~spin lock, sleep 방식보다 RPS 증가~~
+
+#### HikariCP
+
+![](/img/condition-hikaricp.png)
+
+<br>
+
+### Object wait & notifyAll
+
+- 구현 설명: condition 대신 Object.notifyAll(), wait() 사용
+
+#### CPU & memory
+![](/img/notifyall-wait-cpu-memory.png)
+
+- 시스템 CPU 사용률(mean): 0.447
+
+#### Requests per Second
+
+![](/img/notifyall-wait-rps.png)
+
+- RPS 최대: 320
+
+#### HikariCP
+
+![](/img/notifyall-wait-hikaricp.png)
+
+<br>
+
+### Future complete & get
+
+- 구현 설명: Object.notifyAll(), wait() 대신 CompletableFuture.complete(), get() 사용
+
+#### CPU & memory
+![](/img/future-complete-get-cpu-memory.png)
+
+- 시스템 CPU 사용률(mean): 0.497
+
+#### Requests per Second
+
+![](/img/future-complete-get-rps.png)
+
+- RPS 최대: 320
+
+#### HikariCP
+
+![](/img/future-complete-get-hikaricp.png)
 
 <br>
 
@@ -109,5 +158,5 @@ cpu 사용률과 RPS 측정을 위해 약 68,000개 요청을 보냈으며, 그 
 
 ![](/img/http_req_failed_cv.png)
 
-- Condition 방식에서는 모든 부하가 100%로 실패 없이 처리되었는데
+- Condition.await, Object.wait, Future.get 방식에서는 모든 부하가 100%로 실패 없이 처리되었는데
 - 관계가 있는지는 잘 모르겠음. 일단 기록...

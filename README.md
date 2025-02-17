@@ -20,7 +20,7 @@
 - ReentrantLock 잡지 못한 스레드 대기 (while 문 내에서 여러 방식 사용, 하단에 모니터링 결과 추가)
   - 방법 1: while 문 돌면서 로컬 캐시 업데이트 상태 지속 확인 (Spin Lock, Sleep)
   - 방법 2: ReentrantLock을 잡은 생산자 스레드가 신호줄 때까지 sleep 상태 유지 (Object.wait(), future.get())
-  - 방법 3: virtual thread
+  - 방법 3: Virtual Thread (*플랫폼 스레드 기반의 락을 가상 스레드로 전환하면 성능 저하될 수 있다는 피드백 받음*)
 
 ### 단계적 호출
 - 호출 제한에 대비하기 위해 단계적 호출 설계
@@ -42,9 +42,9 @@ ReentrantLock을 잡지 못한 스레드가 로컬 캐시의 업데이트를 기
 - ReentrantLock을 잡은 스레드가 신호줄 때까지 sleep 상태 유지 (Object.wait(), future.get())
 
 테스트 결과부터 기록
-- 예상된 시나리오라면 Future complete & get 방법이 가장 성능이 좋아야 하지만, 별 차이는 없었다.
-- 기능이 많지 않아 내부 요인도 없고,
-- 한정된 테스트 케이스 때문이라 추측된다... 🤔
+- 예상된 시나리오라면 Future complete & get 방법이 가장 성능이 좋아야 하며, **Spin Lock 대비 RPS 120 -> 320 증가**했다.
+- 하지만 Condition.await, Object.wait 방식과는 큰 차이가 없었다.
+- 기능이 많지 않아 내부 요인도 없고, 한정된 테스트 케이스 때문이라 추측된다...🤔
 
 ### Spin lock
 
